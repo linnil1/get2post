@@ -1,0 +1,38 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Get2Post
+
+Globals:
+  Function:
+    Timeout: 10
+
+Parameters:
+  SECRET:
+    Type: String
+    Default: ""
+
+Resources:
+  Get2Post:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: app
+      Handler: get2post
+      Environment:
+        Variables:
+          PORT: 8000
+          GIN_MODE: release
+          APP_SECRET: !Ref SECRET
+      Runtime: provided.al2
+      MemorySize: 128
+      Events:
+        APIEvent:
+          Type: HttpApi
+      Layers:
+        - !Sub arn:aws:lambda:${AWS::Region}:753240598075:layer:LambdaAdapterLayerX86:16
+    Metadata:
+       BuildMethod: makefile
+
+Outputs:
+  GinApi:
+    Description: "API Gateway endpoint URL for Prod stage for Gin function"
+    Value: !Sub "https://${ServerlessHttpApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/"
