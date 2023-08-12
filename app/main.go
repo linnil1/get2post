@@ -4,10 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/nqd/flat"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -53,14 +52,15 @@ func PostJson(targetURL string, jsonData []byte) (string, error) {
 	}
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", errors.New("Failed to read POST response")
 	}
-	return fmt.Sprintf("POST response: %s", body), nil
+	return string(body), nil
 }
 
-func main() {
+func setupRouter(appSecret string) *gin.Engine {
+	// Main function
 	r := gin.Default()
 
 	r.GET("/get2post", func(c *gin.Context) {
@@ -68,7 +68,6 @@ func main() {
 		queryParams := c.Request.URL.Query()
 
 		// Get app secret from env
-		appSecret := os.Getenv("APP_SECRET")
 		if appSecret != "" {
 			secret, _ := retrieveAndDel("secret", &queryParams)
 			if appSecret != secret {
@@ -107,6 +106,11 @@ func main() {
 		}
 		c.JSON(http.StatusOK, gin.H{"message": message})
 	})
+	return r
+}
 
-	r.Run()
+func main() {
+	appSecret := os.Getenv("APP_SECRET")
+	r := setupRouter(appSecret)
+	_ = r.Run() // port: 8080
 }

@@ -1,1 +1,4 @@
-.aws-sam
+.aws-sam/
+samconfig.toml
+bin/
+
