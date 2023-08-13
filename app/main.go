@@ -12,7 +12,7 @@ import (
 	"os"
 )
 
-func retrieveAndDel(key string, queryParams *url.Values) (string, error) {
+func RetrieveAndDel(key string, queryParams *url.Values) (string, error) {
 	// Get key from parameters
 	value := queryParams.Get(key)
 	if value == "" {
@@ -44,22 +44,22 @@ func ExtractDataFromParams(queryParams *url.Values) (map[string]interface{}, err
 	return data.(map[string]interface{}), nil
 }
 
-func PostJson(targetURL string, jsonData []byte) (string, error) {
+func PostJson(targetURL string, jsonData []byte) (int, string, error) {
 	// Send POST request to URL
 	resp, err := http.Post(targetURL, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
-		return "", errors.New("Failed to send POST request")
+		return resp.StatusCode, "", errors.New("Failed to send POST request")
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", errors.New("Failed to read POST response")
+		return resp.StatusCode, "", errors.New("Failed to read POST response")
 	}
-	return string(body), nil
+	return resp.StatusCode, string(body), nil
 }
 
-func setupRouter(appSecret string) *gin.Engine {
+func SetupRouter(appSecret string) *gin.Engine {
 	// Main function
 	r := gin.Default()
 
@@ -69,24 +69,24 @@ func setupRouter(appSecret string) *gin.Engine {
 
 		// Get app secret from env
 		if appSecret != "" {
-			secret, _ := retrieveAndDel("secret", &queryParams)
+			secret, _ := RetrieveAndDel("secret", &queryParams)
 			if appSecret != secret {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid secret"})
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid secret"})
 				return
 			}
 		}
 
 		// Get URL from parameters
-		targetURL, err := retrieveAndDel("url", &queryParams)
+		targetURL, err := RetrieveAndDel("url", &queryParams)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 
 		// Extract Data
 		queryParamsDict, err := ExtractDataFromParams(&queryParams)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 
@@ -94,23 +94,23 @@ func setupRouter(appSecret string) *gin.Engine {
 		jsonData, err := json.Marshal(queryParamsDict)
 		if err != nil {
 			err = errors.New("Failed to convert to JSON")
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 
 		// Send a POST request with JSON data
-		message, err := PostJson(targetURL, jsonData)
+		status, message, err := PostJson(targetURL, jsonData)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"message": message})
+		c.JSON(http.StatusOK, gin.H{"message": message, "status": status})
 	})
 	return r
 }
 
 func main() {
 	appSecret := os.Getenv("APP_SECRET")
-	r := setupRouter(appSecret)
+	r := SetupRouter(appSecret)
 	_ = r.Run() // port: 8080
 }

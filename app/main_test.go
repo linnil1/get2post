@@ -11,18 +11,24 @@ import (
 
 func ExtractJson(t *testing.T, bodyByte []byte) map[string]interface{} {
 	// extract the real json input from response
-	data := make(map[string]string)
-	err := json.Unmarshal(bodyByte, &data)
+	// step1: get the json string from get2post response
+	appJson := make(map[string]interface{})
+	err := json.Unmarshal(bodyByte, &appJson)
 	assert.Nil(t, err)
-	data1 := make(map[string]interface{})
-	err = json.Unmarshal([]byte(data["message"]), &data1)
-	assert.Nil(t, err)
-	out, ok := data1["json"].(map[string]interface{})
+	messageStr, ok := appJson["message"].(string)
 	assert.Equal(t, ok, true)
-	return out
+
+	// step2: json string to json and get what post data is
+	httpbinJson := make(map[string]interface{})
+	err = json.Unmarshal([]byte(messageStr), &httpbinJson)
+	assert.Nil(t, err)
+	data, ok := httpbinJson["json"].(map[string]interface{})
+	assert.Equal(t, ok, true)
+	return data
 }
 
 func TestBasic(t *testing.T) {
+	// Testing under basic usage
 	tests := []struct {
 		password string
 		url      string
@@ -40,21 +46,21 @@ func TestBasic(t *testing.T) {
 			// no data
 			"",
 			"",
-			500,
+			400,
 			nil,
 		},
 		{
 			// password no provided
 			"password",
 			"&data.key1=value1",
-			500,
+			400,
 			nil,
 		},
 		{
 			// password error
 			"password",
 			"&secret=pass&data.key1=value1",
-			500,
+			400,
 			nil,
 		},
 		{
@@ -66,13 +72,15 @@ func TestBasic(t *testing.T) {
 		},
 	}
 
+	// request for each case
 	for _, test := range tests {
-		router := setupRouter(test.password)
+		router := SetupRouter(test.password)
 		record := httptest.NewRecorder()
 		req, _ := http.NewRequest("GET", "/get2post?url=https://httpbun.org/post"+test.url, nil)
 		router.ServeHTTP(record, req)
 		assert.Equal(t, test.status, record.Code)
 
+		// if 200, compare the json with answer
 		if test.status == 200 {
 			ans, _ := json.Marshal(test.ansJson)
 			out, err := json.Marshal(ExtractJson(t, record.Body.Bytes()))
