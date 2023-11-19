@@ -29,7 +29,9 @@ The resulting POST body will be structured as follows:
 Parameter Explanations:
 * `secret`: The required password for activating the service. Leave it empty if `SECRET` is not provided.
 * `url`: The destination URL for posting JSON data.
+* `method`: The destination METHOD (default: POST)
 * `data.*`: Parameters for supplying flattened POST data. Refer to https://github.com/nqd/flat for syntax details.
+* `header.*`: Parameters for supplying flattened HEADER. Refer to https://github.com/nqd/flat for syntax details.
 
 
 

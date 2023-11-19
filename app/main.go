@@ -22,7 +22,7 @@ func RetrieveAndDel(key string, queryParams *url.Values) (string, error) {
 	return value, nil
 }
 
-func ExtractDataFromParams(queryParams *url.Values) (map[string]interface{}, error) {
+func ExtractDataFromParams(queryParams *url.Values, key string) (map[string]interface{}, error) {
 	// Transform parameters into map
 	// Step1: url.Values -> map[string]string{}
 	queryParamsShrink := make(map[string]interface{})
@@ -37,16 +37,25 @@ func ExtractDataFromParams(queryParams *url.Values) (map[string]interface{}, err
 	}
 
 	// step3: Extract 'data' key
-	data, ok := queryParamsDict["data"]
+	data, ok := queryParamsDict[key]
 	if !ok {
-		return nil, errors.New("data not provided")
+		return nil, errors.New(key + " not provided")
 	}
 	return data.(map[string]interface{}), nil
 }
 
-func PostJson(targetURL string, jsonData []byte) (int, string, error) {
+func PostJson(targetURL string, method string, header map[string]interface{}, jsonData []byte) (int, string, error) {
 	// Send POST request to URL
-	resp, err := http.Post(targetURL, "application/json", bytes.NewBuffer(jsonData))
+	client := &http.Client{}
+	req, err := http.NewRequest(method, targetURL, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return 500, "", err
+	}
+	req.Header.Add("Content-Type", "application/json")
+	for k, v := range header {
+		req.Header.Add(k, v.(string))
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return resp.StatusCode, "", errors.New("Failed to send POST request")
 	}
@@ -83,8 +92,20 @@ func SetupRouter(appSecret string) *gin.Engine {
 			return
 		}
 
+		// Get METHOD from parameters
+		method, err := RetrieveAndDel("method", &queryParams)
+		if err != nil {
+			method = "POST"
+		}
+
+		// GET HEADER from parameters
+		header, err := ExtractDataFromParams(&queryParams, "header")
+		if err != nil {
+			header = make(map[string]interface{})
+		}
+
 		// Extract Data
-		queryParamsDict, err := ExtractDataFromParams(&queryParams)
+		queryParamsDict, err := ExtractDataFromParams(&queryParams, "data")
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -99,7 +120,7 @@ func SetupRouter(appSecret string) *gin.Engine {
 		}
 
 		// Send a POST request with JSON data
-		status, message, err := PostJson(targetURL, jsonData)
+		status, message, err := PostJson(targetURL, method, header, jsonData)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
